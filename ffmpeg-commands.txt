@@ -1,0 +1,109 @@
+ffmpeg -i ./stock-3.mp4 -c:v libx265 -c:a aac -s 720x1280 -r:a 48000 -crf 20 -b:a 250k -ss 00:00:05.0 -t 00:00:10.0 ./outro.mkv
+
+ffmpeg -i ./stock-3.mp4 -ss 00:00:05 -to 00:00:05 -c copy ./output.mp4 // copy from - to no encoding
+
+ffmpeg -i stock-3.mp4 -vf "crop=720:720:100:100" output.mp4 // crop=w:h:x:y
+ffmpeg -i stock-3.mp4 -vf "pad=1920:1920:(ow-iw)/2:(oh-ih)/2:black" output.mp4
+ffmpeg -i stock-3.mp4 -filter_complex "[0]pad=w=0+iw:h=1556+ih:x=0:y=778:color=#FF0000" output.mp4
+
+ffmpeg -i ./stock-3.mp4 -vf scale=360:640 ./output.mp4
+ffmpeg -i ./stock-3.mp4 -vf scale=-1:1280 ./output.mp4
+ffmpeg -i ./image.png -vf scale=360:-1 ./output.png // image
+
+ffmpeg -i ./stock-3.mp4 -r 24 ./output.mp4 // frame rate
+
+ffmpeg -i ./stock-3.mp4 -i ./subtitle.srt -c:v copy -c:a copy -c:s mov_text ./output.mp4 // subtitles
+
+ffmpeg -i ./stock-3.mp4 -i ./subtitle.srt -i ./subtitle-2.srt \
+-map 0:v -map 0:a -map 1 -map 2 \
+-c:v copy -c:a copy -c:s mov_text \
+-metadata:s:s:0 language=eng -metadata:s:s:1 language=fre ./output.mp4
+
+ffmpeg -i ./stock-3.mp4 -i ./dogfood.png \
+-filter_complex "[0:v][1:v]overlay=0:0:enable='between(t,2,7)'" \
+-pix_fmt yuv420p -c:a copy ./output.mp4
+
+## Add blurred side backgrounds
+
+ffmpeg -i ./stock-3.mp4 \
+-vf "split[original][copy];[copy]scale=ih*16/9:-1,crop=h=iw*9/16,gblur=sigma=20[blurred];[blurred][original]overlay=(main_w-overlay_w)/2:(main_h-overlay_h)/2" \
+-c:a copy output.mp4
+
+## FFmpeg Concatenate Videos
+
+ffmpeg -i ./stock-1.mp4 -c copy ./1.ts
+ffmpeg -i ./stock-2.mp4 -c copy ./2.ts
+ffmpeg -i ./stock-3.mp4 -c copy ./3.ts
+ffmpeg -i "concat:1.ts|2.ts|3.ts" -c copy output.mp4
+
+ffmpeg -i ./stock-1.mp4 -c copy -bsf:v h264_mp4toannexb -f mpegts 1.ts
+ffmpeg -i ./stock-2.mp4 -c copy -bsf:v h264_mp4toannexb -f mpegts 2.ts
+ffmpeg -i ./stock-3.mp4 -c copy -bsf:v h264_mp4toannexb -f mpegts 3.ts
+ffmpeg -i "concat:1.ts|2.ts|3.ts" -c copy -bsf:a aac_adtstoasc ./output.mp4
+
+
+
+
+
+OVERLAY
+
+ffmpeg -i ./stock-3.mp4 -i ../image/overlay-50.png -filter_complex "overlay" ./output.mp4
+ffmpeg -i ./stock-3.mp4 -filter_complex "color=color=black@0.5:size=720x1280 [over]; [0:v][over] overlay=shortest=1" ./output.mp4
+
+CONCAT
+
+ffmpeg -i ./stock-1.mp4 -i ./stock-2.mp4 -i ./stock-3.mp4 -filter_complex \
+"[0:v] scale=w=720:h=1280, fps=fps=30 [v1];
+ [1:v] scale=w=720:h=1280, fps=fps=30 [v2];
+ [2:v] scale=w=720:h=1280, fps=fps=30 [v3];
+ [v1][v2][v3]concat=n=3:v=1[outv]" \
+  -map "[outv]" ./output.mp4
+
+MIX
+
+ffmpeg -i ./voiceover.mp3 -i ./music.mp3 -filter_complex "amix=inputs=2:dropout_transition=0" ./output.mp3
+
+TEXT
+
+ffmpeg -y -i ./stock-2.mp4 -filter_complex "drawtext=
+x=(W-text_w)/2:
+y=(H-text_h)/4:
+fontfile=./font.ttf:
+fontsize=50:
+fontcolor=white:
+enable=between(t\,2.1\,2.3):
+text='A ship in the harbor is safe\, but...' "  ./output.mp4
+
+TRIM
+
+ffmpeg -y -i ./stock-2.mp4 -filter_complex "trim=start=3.123:end=5.123,setpts=PTS-STARTPTS" ./output.mp4
+ffmpeg -y -i ./music.mp3 -filter_complex "atrim=start=27:end=34,setpts=PTS-STARTPTS" ./output.mp3
+
+SUBTITLE
+
+ffmpeg -y -i ./stock-2.mp4 -filter_complex "subtitles=filename=./subtitle.srt:fontsdir=./:force_style='Alignment=10,Outline=0,Fontsize=5,Fontname=JungleFeverNF,Spacing=0,MarginR=100,MarginL=100,PrimaryColour=&HFFFFFF,Bold=-1'" ./output.mp4
+
+BLACK BG
+ffmpeg -f lavfi -i color=black:s=1440x2560:d=10:r=30  ./output.mp4
+
+--------------------------------------------
+
+ffmpeg -y -i ./stock-3.mp4 -i ./black-bg.mp4 -i ./stock-1.mp4 -i ./voiceover.mp3 -i ./music.mp3 -filter_complex \
+"[0:v] trim=start=0:end=3.74, setpts=PTS-STARTPTS, scale=w=720:h=1280, fps=fps=30 [v1];
+ [1:v] trim=start=0:end=2.07, setpts=PTS-STARTPTS, scale=w=720:h=1280, fps=fps=30 [v2];
+ [2:v] trim=start=0:end=4, setpts=PTS-STARTPTS, scale=w=720:h=1280, fps=fps=30 [v3];
+
+ [v1][v2][v3]concat=n=3:v=1[concat];
+
+ color=color=black@0.5:size=720x1280 [overlay]; [concat][overlay] overlay=shortest=1[overlayedv];
+
+ [overlayedv]subtitles=filename=./subtitle.srt:fontsdir=./:force_style='Alignment=10,Outline=0,Fontsize=5,Fontname=Bank Gothic Light BT,Spacing=0,MarginR=100,MarginL=100,PrimaryColour=&HFFFFFF,Bold=-1'[outv];
+
+ [3:a] atrim=start=0, asetpts=PTS-STARTPTS [a1];
+ [4:a] atrim=start=20.69:end=30.5, asetpts=PTS-STARTPTS [a2];
+ [a1][a2]amix=inputs=2:dropout_transition=0[outa]" \
+  -map "[outv]" -map "[outa]" ./output.mp4
+
+
+
+x=(W-text_w)/2:y=(H-text_h)/4:fontfile=./font.ttf:fontsize=50:fontcolor=white:text='A ship in the harbor is safe, but...'

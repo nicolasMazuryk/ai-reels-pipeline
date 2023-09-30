@@ -5,7 +5,7 @@ const { AWS_CONFIG } = require('./config.cjs')
 AWS.config.update(AWS_CONFIG)
 
 const axios = require('axios')
-const {readFile} = require("./utils.cjs");
+const {  readFile } = require("./utils.cjs");
 const s3 = new AWS.S3()
 
 const getFromS3 = async (bucket, key) => {
@@ -14,7 +14,9 @@ const getFromS3 = async (bucket, key) => {
         Key: key
     }
 
-    return s3.getObject(downloadParams).promise()
+    const response = await s3.getObject(downloadParams).promise()
+
+    return response.Body
 }
 
 const getFromS3Stream = (bucket, key) => {

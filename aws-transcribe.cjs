@@ -1,12 +1,12 @@
 const fs = require('fs')
 const path = require("path")
+const { parse, resync, map, stringify } = require('subtitle')
 
 const AWS = require('aws-sdk')
 
 const { AWS_CONFIG, INSTAGRAM_SOURCE_USER_ID, AWS_S3_BUCKET} = require('./config.cjs')
 const { uuidV4, wait } = require('./utils.cjs')
 const { getFromS3Stream, uploadToS3ByPath} = require('./s3.cjs')
-const { parse, resync, stringify } = require('subtitle')
 
 AWS.config.update(AWS_CONFIG)
 
@@ -27,7 +27,7 @@ const voiceToSubtitle = async (mediaName, mediaUrl) => {
         OutputKey: `${INSTAGRAM_SOURCE_USER_ID}/subtitle/${mediaName}`,
         Subtitles: {
             Formats: ["srt"],
-            OutputStartIndex: 0, // 0 default
+            OutputStartIndex: 1, // 0 default
         }
     }
 
@@ -51,7 +51,7 @@ const voiceToSubtitle = async (mediaName, mediaUrl) => {
     return response.TranscriptionJob.Subtitles.SubtitleFileUris[0]
 }
 
-const resyncSubtitles = (item) => {
+const resyncSubtitles = async (item) => {
     const bucket = AWS_S3_BUCKET
     const key = `${INSTAGRAM_SOURCE_USER_ID}/subtitle/${item.id}.srt`
 
@@ -59,13 +59,29 @@ const resyncSubtitles = (item) => {
 
     const subtitleFilePath = path.join(subtitleFolderPath, `${item.id}.srt`)
 
-    stream
-        .pipe(parse())
-        .pipe(resync(2000))
-        .pipe(stringify({ format: 'SRT' }))
-        .pipe(fs.createWriteStream(subtitleFilePath))
+    const SUBTITLE_RESYNC_OFFSET = 0
+
+    item.subtitle.nodes = []
+
+    await new Promise((resolve => {
+        stream
+            .pipe(parse())
+            .pipe(resync(SUBTITLE_RESYNC_OFFSET))
+            .pipe(
+                map(node => {
+                    item.subtitle.nodes.push(node.data)
+
+                    return node
+                })
+            )
+            .pipe(stringify({ format: 'SRT' }))
+            .pipe(fs.createWriteStream(subtitleFilePath))
+            .on('finish', resolve)
+    }))
 
     item.subtitle.path = subtitleFilePath
+
+    return item
 }
 
 const getSubtitle = async (item) => {
@@ -75,7 +91,7 @@ const getSubtitle = async (item) => {
 
     item.subtitle.url = await voiceToSubtitle(item.id, item.voiceover.s3.Location)
 
-    await resyncSubtitles(item)
+    return resyncSubtitles(item)
 }
 
 module.exports = { getSubtitle, voiceToSubtitle }

@@ -1,7 +1,7 @@
 const fs = require('fs')
 const path = require("path")
 
-const { getInstagramChannelContent } = require('./get-instagram-channel-posts.cjs');
+const { getInstagramChannelContent, addAudioToMusicLibrary } = require('./get-instagram-channel-posts.cjs');
 const { detectTextOnImage } = require('./detect-text-on-image.cjs');
 const { detectTextOnVideo } = require('./detect-text-on-video.cjs');
 const { detectedTextImageNormalizer } = require('./detected-text-image-normalizer.cjs');
@@ -12,8 +12,10 @@ const { uploadToS3ByURL } = require('./s3.cjs');
 const { getVoiceOver } = require('./elevenlabs.cjs');
 const { speechToText } = require('./whisper.cjs');
 const { prepareTextToVoiceOver } = require('./open-ai.cjs');
-const { getSubtitle } = require('./aws-transcribe.cjs');
-const { generateVideo } = require('./ffcreator-video.cjs');
+// const { getSubtitle } = require('./aws-transcribe.cjs');
+const { getSubtitle } = require('./assemblyai-transcribe.cjs');
+// const { generateVideo } = require('./ffcreator-video.cjs');
+const { generateVideo } = require('./fluent-ffmpeg.cjs');
 
 const { readFile, writeFile } = require('./utils.cjs');
 
@@ -30,6 +32,7 @@ const {
     GET_VIDEO_TEXT_CONTENT_LIMIT,
     GENERATE_AUDIO_LIMIT,
     OUTPUT_VIDEO_LIMIT,
+    ADD_TO_MUSIC_LIBRARY_LIMIT,
 } = require('./config.cjs')
 
 const dataStoragePath = path.join(__dirname, 'data', INSTAGRAM_SOURCE_USER_ID)
@@ -61,8 +64,20 @@ const getImageText = async () => {
     fs.writeFileSync(`${dataStoragePath}/image-content.json`, JSON.stringify(result, null,2))
 }
 
-const runVideos = async () => {
+const downloadVideoMusicToLibrary = async () => {
     const file = await readFile(`${dataStoragePath}/video.json`, 'utf-8')
+    const parsed = JSON.parse(file)
+
+    const list = parsed.slice(0, ADD_TO_MUSIC_LIBRARY_LIMIT)
+
+    await addAudioToMusicLibrary(list)
+
+    await writeFile(`${dataStoragePath}/video.json`, JSON.stringify(list, null,2))
+}
+
+const runVideos = async () => {
+    // const file = await readFile(`${dataStoragePath}/video.json`, 'utf-8')
+    const file = await readFile(`${dataStoragePath}/video-content.json`, 'utf-8')
     const parsed = JSON.parse(file)
 
     const list = parsed.slice(0, OUTPUT_VIDEO_LIMIT)
@@ -70,7 +85,7 @@ const runVideos = async () => {
     for (const item of list) {
         const { id, source } = item
 
-        item.voiceover = {}
+        // item.voiceover = {}
         item.subtitle = {}
         item.post = {}
 
@@ -81,7 +96,7 @@ const runVideos = async () => {
         // const detectedTextLines = await detectTextOnVideo(item)
         // item.detectedText = detectedTextVideoNormalizer(INSTAGRAM_SOURCE_USER_ID, detectedTextLines)
 
-        item.voiceover.detectedText = await speechToText(item.source.video.url)
+        // item.voiceover.detectedText = await speechToText(item)
 
         item.voiceover.text = await prepareTextToVoiceOver(item.voiceover.detectedText)
 
@@ -138,7 +153,7 @@ const generateNewVideo = async () => {
         item.post = await generateVideo(item)
     }
 
-    await writeFile(`${dataStoragePath}/video-post.json`, JSON.stringify(posts, null,2))
+    await writeFile(`${dataStoragePath}/video-post.json`, JSON.stringify(list, null,2))
 }
 
 const publishPost = async () => {
@@ -155,11 +170,14 @@ const publishPost = async () => {
 (async () => {
     // await getInstagramContent()
 
+    // await downloadVideoMusicToLibrary()
+
     // await runVideos()
 
     // await generateNewImages()
     await generateNewVideo()
 
     // await publishPost()
+
 })()
 

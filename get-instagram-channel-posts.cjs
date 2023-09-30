@@ -1,6 +1,7 @@
 const axios = require('axios')
+const path = require('path')
 
-const { updateMusicLibrary } = require('./utils.cjs')
+const { updateMusicLibrary, writeFile, convertMP4toMP3 } = require('./utils.cjs')
 
 const {
     INSTAGRAM_USER_AGENT,
@@ -32,6 +33,10 @@ const setImageData = (data, item) => {
         // originalHeight: item.original_height,
     }
 
+    const music = item?.clips_metadata?.music_info?.music_asset_info
+
+    data.music = music ? `${music.display_artist} - ${music.title}.mp4` : ''
+
     return data
 }
 
@@ -48,7 +53,10 @@ const setVideoData = (data, item) => {
         // originalWidth: item.original_width,
         // originalHeight: item.original_height,
     }
-    data.audioID = item?.clips_metadata?.music_info?.music_asset_info?.id
+
+    const music = item?.clips_metadata?.music_info?.music_asset_info
+
+    data.music = music ? `${music.display_artist} - ${music.title}.mp4` : ''
 
     return data
 }
@@ -57,20 +65,36 @@ const addAudioToMusicLibrary = async (posts) => {
     const items = posts.slice(0, INSTAGRAM_MAX_FEED_COUNT)
 
     for (const item of items) {
-        if (!item?.clips_metadata?.music_info?.music_asset_info) continue
+        const { audio } = item.source
 
-        const audio = item.clips_metadata.music_info.music_asset_info
+        if (!audio) continue
 
         const data = {}
 
         data.id = audio.id
-        data.name = audio.title
+        data.title = audio.title
         data.artist = audio.display_artist
+        data.name = `${data.artist} - ${data.title}.mp4`
         data.url = audio.progressive_download_url
+        data.path = path.join(__dirname, 'assets', 'music', data.name)
         data.highlights = audio.highlight_start_times_in_ms
         data.duration = audio.duration_in_ms
 
-        await updateMusicLibrary(data)
+        delete item.source.audio
+
+        const isExistInLibrary = await updateMusicLibrary(data)
+
+        if (isExistInLibrary) return
+
+        const response = await axios({
+            method: 'GET',
+            url: data.url,
+            responseType: 'arraybuffer'
+        })
+
+        await writeFile(data.path, response.data)
+
+        // await convertMP4toMP3(response.data, data.path)
     }
 }
 
@@ -85,11 +109,14 @@ const parseChannelPosts = (items) => {
             caption,
         } = item
 
+        const audio = item?.clips_metadata?.music_info?.music_asset_info
+
         const data = {
             timestamp: taken_at,
-            comments: comment_count,
             likes: like_count,
+            comments: comment_count,
             caption: caption.text,
+            audio,
         }
 
         if (media_type === 1) { // image
@@ -125,7 +152,7 @@ const getInstagramChannelContent = async (userId) => {
 
     posts.push(...parseChannelPosts(data.items))
 
-    await addAudioToMusicLibrary(data.items)
+    // await addAudioToMusicLibrary(data.items)
 
     let isMoreItemsAvailable = data.more_available
     let nextMaxId = data.next_max_id
@@ -135,7 +162,7 @@ const getInstagramChannelContent = async (userId) => {
 
         posts.push(...parseChannelPosts(items))
 
-        await addAudioToMusicLibrary(data.items)
+        // await addAudioToMusicLibrary(data.items)
 
         isMoreItemsAvailable = more_available
         nextMaxId = next_max_id
@@ -144,4 +171,4 @@ const getInstagramChannelContent = async (userId) => {
     return posts.slice(0, INSTAGRAM_MAX_FEED_COUNT)
 }
 
-module.exports = { getInstagramChannelContent }
+module.exports = { getInstagramChannelContent, addAudioToMusicLibrary }

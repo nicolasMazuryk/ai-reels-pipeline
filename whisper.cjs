@@ -5,21 +5,24 @@ const FormData = require('form-data')
 
 const { OPEN_AI_API_KEY} = require('./config.cjs')
 const { writeFile } = require('./utils.cjs')
+const { getFromS3 } = require('./s3.cjs')
 
 const OPEN_AI_BASE_URL = 'https://api.openai.com'
 
-const speechToText = async (url) => {
-    let data = new FormData()
+const speechToText = async (item) => {
+    const sourceFile = await getFromS3(item.source.s3.Bucket, item.source.s3.Key)
 
-    const res = await axios({
-        method: 'GET',
-        url: url,
-        responseType: 'arraybuffer'
-    })
+    // const res = await axios({
+    //     method: 'GET',
+    //     url: url,
+    //     responseType: 'arraybuffer'
+    // })
 
     const filePath = path.join(__dirname, '.cache', 'source', 'temporary.mp4')
 
-    await writeFile(filePath, res.data)
+    await writeFile(filePath, sourceFile)
+
+    let data = new FormData()
 
     data.append('model', 'whisper-1')
     data.append('file', fs.createReadStream(filePath))

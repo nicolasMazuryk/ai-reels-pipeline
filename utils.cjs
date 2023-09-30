@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const uuid = require('uuid');
+const ffmpeg = require('fluent-ffmpeg')
 
 const musicLibraryPath = path.join(__dirname, 'data', 'db', 'music-library.json')
 
@@ -13,10 +14,12 @@ const updateMusicLibrary = async (data) => {
     const musicLibraryJSON = await readFile(musicLibraryPath)
     const musicLibrary = JSON.parse(musicLibraryJSON)
 
-    if (musicLibrary.find((item) => item.id === data.id)) return
+    if (musicLibrary.find((item) => item.id === data.id)) return true
 
     musicLibrary.push(data)
     await writeFile(musicLibraryPath, JSON.stringify(musicLibrary, null, 2))
+
+    return false
 }
 
 const generateFilename = (text) => {
@@ -90,6 +93,43 @@ const filterIncompleteTextArrayItems = (scenes) => {
     return filteredScenes
 }
 
+const convertMP4toMP3 = async (data, outputPath) => {
+    const tempSourceFilePath = path.join(__dirname, '.cache', 'music', 'temporary-music-converted.mp4')
+
+    await writeFile(tempSourceFilePath, data)
+
+    return new Promise((resolve, reject) => {
+        ffmpeg.ffprobe(tempSourceFilePath, (err, metadata) => {
+            if (err) throw err;
+
+            ffmpeg(tempSourceFilePath)
+                .audioCodec('libmp3lame')
+                // .audioBitrate('320k')
+                .audioChannels(2)
+                .format('mp3')
+                .save(outputPath)
+                .on('end', () => {
+                    resolve(outputPath)
+                })
+                .on('error', (err) => {
+                    reject(err)
+                })
+                .run()
+        })
+    })
+}
+
+const getAudioDuration = async (path) => {
+    return new Promise((resolve, reject) => {
+        ffmpeg.ffprobe(path, (err, metadata) => {
+            if (err) return reject(err)
+
+            resolve(metadata.format.duration)
+            // resolve(metadata.format.duration_ts)
+        })
+    })
+}
+
 module.exports = {
     readFile,
     writeFile,
@@ -101,4 +141,6 @@ module.exports = {
     groupByTimestamp,
     filterUniqueItems,
     updateMusicLibrary,
+    convertMP4toMP3,
+    getAudioDuration,
 }

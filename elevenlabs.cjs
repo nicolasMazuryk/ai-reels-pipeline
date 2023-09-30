@@ -6,6 +6,7 @@ const { wait } = require('./utils.cjs')
 
 const dataStoragePath = path.join(__dirname, 'assets', 'voiceover')
 
+const ADAM_VOICE_ID = 'pNInz6obpgDQGcFmaJgB'
 const FAR_FROM_WEEK_VOICE_ID = 'zXoSXZOkCLj3wsgWwJJu'
 
 const textToSpeech = async (voiceID, fileName, textInput) => {
@@ -15,7 +16,7 @@ const textToSpeech = async (voiceID, fileName, textInput) => {
 const getVoiceOver = async (item) => {
     const filePath = path.join(dataStoragePath, `${item.id}.mp3`)
 
-    await textToSpeech(FAR_FROM_WEEK_VOICE_ID, filePath, item.voiceover.text)
+    await textToSpeech(ADAM_VOICE_ID, filePath, item.voiceover.text)
 
     await wait(1000)
 
