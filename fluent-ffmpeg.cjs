@@ -42,20 +42,46 @@ const generateVideo = async (item) => {
     const musicStartTimeInSeconds = Number((musicStartTime / 1000).toFixed(3))
     const musicEndTimeInSeconds = Number((musicEndTime / 1000).toFixed(3))
 
+
+    // ffmpeg()
+    //     .input(join(assetsPath, 'video', '3', '1.mp4'))
+    //     .input(join(assetsPath, 'video', '3', '2.mp4'))
+    //     .complexFilter([
+    //         `[0:v] trim=start=0:end=${0}, setpts=PTS-STARTPTS, scale=w=${-1}:h=${height}, crop=w=${width}:h=${height}, fps=fps=30, eq=brightness=-0.06:saturation=-2 [v1]`,
+    //         `[1:v] trim=start=0:end=${musicPlayAfterDropDurationInSeconds}, setpts=PTS-STARTPTS, scale=w=${-1}:h=${height}, crop=w=${width}:h=${height}, fps=fps=30, format=gray, colorlevels=rimin=0.5:gimin=0.5:bimin=0.5, colorlevels=romax=0.4:gomax=0.4:bomax=0.4, unsharp=luma_msize_x=7:luma_msize_y=7:luma_amount=2.5 [v2]`,
+    //
+    //         `[v1][v2]concat=n=2:v=1:unsafe=1[concat]`,
+    //     ])
+    //     .outputOptions([
+    //         '-map [concat]',
+    //         // '-map [outa]'
+    //     ])
+    //     .save(outputVideoPath)
+    //     .on('progress', function(progress) {
+    //         console.log('Processing: ' + progress.percent + '% done');
+    //     })
+    //     .on('error', function(err, stdout, stderr) {
+    //         console.log('Cannot process video: ' + err.message);
+    //     })
+    //     .on('end', () => {
+    //         console.log('Video conversion finished!');
+    //     })
+
+
     ffmpeg()
-        .input(join(assetsPath, 'video', '7', '1.mp4'))
-        .input(join(assetsPath, 'video', '7', '2.mp4'))
+        .input(join(assetsPath, 'video', '1', '1.mp4'))
+        .input(join(assetsPath, 'video', '1', '2.mp4'))
         .input(item.voiceover.path)
         .input(music.path)
         .input(logoPath)
         .complexFilter([
-            // `[0:v] trim=start=0:end=${voiceoverDurationInSeconds}, setpts=PTS-STARTPTS, scale=w=${-1}:h=${height}, crop=w=${width}:h=${height}, scale=w=${width}:h=${height}, fps=fps=30 [v1]`,
-            `[0:v] trim=start=0:end=${voiceoverDurationInSeconds}, setpts=PTS-STARTPTS, scale=w=${-1}:h=${height}, crop=w=${width}:h=${height}, fps=fps=30, eq=brightness=-0.06:saturation=-2 [v1]`,
-            `[1:v] trim=start=0:end=${musicPlayAfterDropDurationInSeconds}, setpts=PTS-STARTPTS, scale=w=${-1}:h=${height}, crop=w=${width}:h=${height}, fps=fps=30, eq=brightness=-0.06:saturation=-2 [v2]`,
+            `[0:v] trim=start=0:end=${voiceoverDurationInSeconds}, setpts=PTS-STARTPTS, scale=w=${-1}:h=${height}, crop=w=${width}:h=${height}, fps=fps=30, format=gray, colorlevels=rimin=0.5:gimin=0.5:bimin=0.5, colorlevels=romax=0.5:gomax=0.5:bomax=0.5, unsharp=luma_msize_x=7:luma_msize_y=7:luma_amount=2.5 [v1]`,
+            // `[1:v] trim=start=0:end=${musicPlayAfterDropDurationInSeconds}, setpts=PTS-STARTPTS, scale=w=${-1}:h=${height}, crop=w=${width}:h=${height}, fps=fps=30, eq=brightness=-0.06:saturation=-2 [v2]`,
+            `[1:v] trim=start=0:end=${musicPlayAfterDropDurationInSeconds}, setpts=PTS-STARTPTS, scale=w=${-1}:h=${height}, crop=w=${width}:h=${height}, fps=fps=30, format=gray, colorlevels=rimin=0.5:gimin=0.5:bimin=0.5, colorlevels=romax=0.5:gomax=0.5:bomax=0.5, unsharp=luma_msize_x=7:luma_msize_y=7:luma_amount=2.5 [v2]`,
 
-            `[v1][v2]concat=n=2:v=1[concat]`,
+            `[v1][v2]concat=n=2:v=1:unsafe=1[concat]`,
 
-            `color=color=black@0.7:size=${width}x${height}[overlay]`,
+            `color=color=black@0.0:size=${width}x${height}[overlay]`,
             `[concat][overlay]overlay=shortest=1[darkened]`,
 
             `[4:v][darkened]scale2ref=w=oh*mdar:h=ih/20 [scaled-logo][scaled-video]`,
