@@ -1,9 +1,17 @@
 {
-  "name": "faceless",
+  "name": "ai-reels-pipeline",
+  "version": "0.1.0",
+  "description": "End-to-end AI short-video pipeline: source, transcribe, script, voice, render and auto-publish to Instagram.",
+  "license": "MIT",
+  "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=20.6"
+  },
   "scripts": {
-    "get-instagram-content": "node index.cjs",
-    "ffcreator": "node ffcreator-video.cjs"
+    "get-instagram-content": "node --env-file=.env index.cjs",
+    "ffcreator": "node --env-file=.env ffcreator-video.cjs",
+    "check": "for f in *.cjs; do node --check \"$f\" || exit 1; done"
   },
   "dependencies": {
     "aws-sdk": "^2.1370.0",
