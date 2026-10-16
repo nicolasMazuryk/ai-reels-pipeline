@@ -1,10 +1,15 @@
 .DS_Store
 .idea
+.claude/worktrees/
 
 node_modules
+
+.env*
+!.env.example
 
 .cache
 assets
 data
 output
 trash
+*.log
